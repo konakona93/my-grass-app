@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吐槽除草机 - 官方高保真部署版</title>
+    <title>吐槽除草机 - GitHub 调优部署版</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -75,18 +75,29 @@
             font-size: 13px;
             font-weight: bold;
             cursor: pointer;
+            transition: all 0.2s;
         }
+        .btn:active { transform: scale(0.98); }
         .btn-submit { background: #2b8a3e; color: white; }
         .btn-summon { background: #fab005; color: #111; }
+        
+        /* 💡 新增：镰刀控制按钮样式 */
+        .btn-scythe { background: #495057; color: white; }
+        .btn-scythe.active { background: #e03131; box-shadow: 0 0 10px rgba(224, 49, 49, 0.5); }
 
-        /* ==================== 核心：通过相对路径加载你的实景照片 ==================== */
+        /* 大草原背景 */
         .meadow-bg {
             flex: 1;
             position: relative;
-            background-image: url('bg.jpg'); /* 加载你上传的背景图 */
+            background-image: url('bg.jpg'); 
             background-size: cover;
             background-position: center;
             overflow: hidden;
+        }
+
+        /* 💡 开启镰刀模式时的鼠标样式 */
+        .meadow-bg.scythe-active {
+            cursor: url('scythe.png') 16 16, crosshair; /* 如果你准备好了镰刀图片，放同目录下即可自动生效 */
         }
 
         .grass-cluster {
@@ -102,7 +113,7 @@
 
         @keyframes sprout { 0% { transform: scale(0); } 100% { transform: scale(1); } }
 
-        /* 加载你上传的实景长草图 */
+        /* 实景草图 */
         .grass-photo {
             width: 75px;
             height: 75px;
@@ -138,11 +149,10 @@
             background-repeat: no-repeat;
             background-position: center;
             z-index: 90;
-            transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: all 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* 动作调平缓 */
             filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3));
         }
         
-        /* 加载你上传的实景牛马图 */
         .cow-style { background-image: url('cow.png'); }
         .horse-style { background-image: url('horse.png'); }
 
@@ -191,14 +201,17 @@
                     <button class="btn btn-submit" onclick="plantGrass()">发送</button>
                 </div>
             </div>
-            <button class="btn btn-summon" onclick="toggleNiuma()">💡 召唤牛马 (演示专用) 🐮🐴</button>
+            <div style="display: flex; gap: 6px;">
+                <button class="btn btn-summon" style="flex: 1;" onclick="toggleNiuma()">💡 召唤牛马 🐮🐴</button>
+                <button class="btn btn-scythe" id="scytheBtn" style="flex: 1;" onclick="toggleScytheMode()">✂️ 开启镰刀模式</button>
+            </div>
         </div>
 
         <div class="toast-tip" id="toastTip"></div>
         <div class="meadow-bg" id="meadow"></div>
 
         <div class="bottom-bar">
-            📱 Gitee Pages 官方部署版 | 输入后直接敲【回车键】即可种草
+            📱 已限高防遮挡调优 | 牛马吃草速度已大幅调慢
         </div>
     </div>
 
@@ -206,17 +219,18 @@
         const meadow = document.getElementById('meadow');
         const complainInput = document.getElementById('complainText');
         const toastTip = document.getElementById('toastTip');
+        const scytheBtn = document.getElementById('scytheBtn');
 
         let grassItems = [];
         let cowObj = null;
         let horseObj = null;
         let niumaTimer = null;
+        let scytheMode = false; // 镰刀模式开关变量
 
-        // 【新增优化】监听键盘回车键事件，直接发送
         complainInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
-                event.preventDefault(); // 阻止多余的默认换行行为
-                plantGrass();           // 执行种草逻辑
+                event.preventDefault();
+                plantGrass();
             }
         });
 
@@ -226,6 +240,22 @@
             setTimeout(() => { toastTip.style.display = 'none'; }, 2000);
         }
 
+        // 💡 优化：新增切换镰刀模式的按钮功能
+        function toggleScytheMode() {
+            scytheMode = !scytheMode;
+            if (scytheMode) {
+                scytheBtn.classList.add('active');
+                scytheBtn.innerText = "🛑 关闭镰刀模式";
+                meadow.classList.add('scythe-active');
+                showToast("镰刀已装备！点击草丛或者让陌生人来除草吧！");
+            } else {
+                scytheBtn.classList.remove('active');
+                scytheBtn.innerText = "✂️ 开启镰刀模式";
+                meadow.classList.remove('scythe-active');
+                showToast("已收回镰刀");
+            }
+        }
+
         function plantGrass() {
             const rawText = complainInput.value.trim();
             if (!rawText) {
@@ -233,7 +263,6 @@
                 return;
             }
 
-            // 严格执行12个字内截断
             let shortText = rawText;
             if (rawText.length > 12) {
                 shortText = rawText.substring(0, 12) + "...";
@@ -242,20 +271,19 @@
             const grass = document.createElement('div');
             grass.className = 'grass-cluster';
             
-            // 随机坐标计算（配合你的实景图，将草丛精准限制在山丘下的草坪区域）
+            // 💡 优化：完美限制草群生长安全区。Y轴控制在 52% 到 82%，彻底空出最底部 18% 的安全白区
             const x = Math.random() * 75 + 5;  
-            const y = Math.random() * 35 + 55; // 55% - 90% 的区间，视觉层级最合理
+            const y = Math.random() * 30 + 52; 
             grass.style.left = `${x}%`;
             grass.style.top = `${y}%`;
             grass.style.zIndex = Math.floor(y);
 
-            // 结构：上草下字
             grass.innerHTML = `
                 <div class="grass-photo"></div>
                 <div class="comment-text" title="${rawText}">${shortText}</div>
             `;
 
-            // 点击任意单棵草直接手工移除
+            // 手动除草（如果开启镰刀模式，效果更搭）
             grass.addEventListener('click', () => {
                 grass.style.transform = 'scale(0)';
                 setTimeout(() => {
@@ -266,10 +294,9 @@
 
             meadow.appendChild(grass);
             grassItems.push(grass);
-            complainInput.value = ''; // 发送完毕自动清空
+            complainInput.value = '';
         }
 
-        // 召唤牛马吃草逻辑
         function toggleNiuma() {
             if (cowObj || horseObj) {
                 if (cowObj) cowObj.remove();
@@ -285,7 +312,7 @@
                 return;
             }
 
-            showToast("🐮🐴 实景牛马已入场，开始自动除草...");
+            showToast("🐮🐴 实景牛马已入场，开始悠闲吃草...");
 
             cowObj = document.createElement('div');
             cowObj.className = 'niuma-photo cow-style';
@@ -298,7 +325,7 @@
             meadow.appendChild(cowObj);
             meadow.appendChild(horseObj);
 
-            // 牛马吃草自动化跑车
+            // 💡 优化：自动化定时器从 2000 调到了 8000 (即每 8 秒消灭一棵，慢节奏治愈吃草)
             niumaTimer = setInterval(() => {
                 if (grassItems.length > 0) {
                     const targetGrass = grassItems[Math.floor(Math.random() * grassItems.length)];
@@ -315,9 +342,9 @@
                             targetGrass.remove();
                             grassItems = grassItems.filter(item => item !== targetGrass);
                         }, 200);
-                    }, 600);
+                    }, 1200); // 增加牛马走过去后低头吃草的停留时间
                 }
-            }, 2000);
+            }, 8000); 
         }
     </script>
 </body>
