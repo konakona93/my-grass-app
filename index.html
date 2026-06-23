@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吐槽除草机 - 官方高保真部署版</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 1920*1080 纵向真机比例外壳 */
+        .phone-container {
+            width: 420px;
+            height: 840px;
+            background: #000;
+            border-radius: 40px;
+            border: 10px solid #2d2d2d;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 140px;
+            height: 22px;
+            background: #2d2d2d;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+            z-index: 999;
+        }
+
+        /* 顶部控制面板 */
+        .control-panel {
+            padding: 28px 14px 12px 14px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #ddd;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .title-label { font-size: 13px; font-weight: 600; color: #555; }
+        .input-row { display: flex; gap: 6px; }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: #2b8a3e; }
+
+        .btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-submit { background: #2b8a3e; color: white; }
+        .btn-summon { background: #fab005; color: #111; }
+
+        /* ==================== 核心：通过相对路径加载你的实景照片 ==================== */
+        .meadow-bg {
+            flex: 1;
+            position: relative;
+            background-image: url('bg.jpg'); /* 加载你上传的背景图 */
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        .grass-cluster {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transform-origin: bottom center;
+            animation: sprout 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        @keyframes sprout { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+
+        /* 加载你上传的实景长草图 */
+        .grass-photo {
+            width: 75px;
+            height: 75px;
+            background-image: url('grass.png'); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: bottom center;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        .comment-text {
+            background: rgba(255, 255, 255, 0.9);
+            color: #111;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 8px;
+            border-radius: 20px;
+            margin-top: 2px;
+            white-space: nowrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            border: 1px solid rgba(0,0,0,0.05);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+        }
+
+        .niuma-photo {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 90;
+            transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.3));
+        }
+        
+        /* 加载你上传的实景牛马图 */
+        .cow-style { background-image: url('cow.png'); }
+        .horse-style { background-image: url('horse.png'); }
+
+        @keyframes munch {
+            0% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.05) rotate(8deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        .munching { animation: munch 0.4s ease infinite; }
+
+        .toast-tip {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+            pointer-events: none;
+        }
+
+        .bottom-bar {
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            color: #999;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="phone-container">
+        <div class="phone-notch"></div>
+        
+        <div class="control-panel">
+            <div>
+                <div class="title-label">写下你的槽点（按回车键或点按钮直接发送）：</div>
+                <div class="input-row">
+                    <input type="text" id="complainText" placeholder="吐槽点什么吧..." maxlength="40">
+                    <button class="btn btn-submit" onclick="plantGrass()">发送</button>
+                </div>
+            </div>
+            <button class="btn btn-summon" onclick="toggleNiuma()">💡 召唤牛马 (演示专用) 🐮🐴</button>
+        </div>
+
+        <div class="toast-tip" id="toastTip"></div>
+        <div class="meadow-bg" id="meadow"></div>
+
+        <div class="bottom-bar">
+            📱 Gitee Pages 官方部署版 | 输入后直接敲【回车键】即可种草
+        </div>
+    </div>
+
+    <script>
+        const meadow = document.getElementById('meadow');
+        const complainInput = document.getElementById('complainText');
+        const toastTip = document.getElementById('toastTip');
+
+        let grassItems = [];
+        let cowObj = null;
+        let horseObj = null;
+        let niumaTimer = null;
+
+        // 【新增优化】监听键盘回车键事件，直接发送
+        complainInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // 阻止多余的默认换行行为
+                plantGrass();           // 执行种草逻辑
+            }
+        });
+
+        function showToast(msg) {
+            toastTip.innerText = msg;
+            toastTip.style.display = 'block';
+            setTimeout(() => { toastTip.style.display = 'none'; }, 2000);
+        }
+
+        function plantGrass() {
+            const rawText = complainInput.value.trim();
+            if (!rawText) {
+                showToast("内容不能为空哦！");
+                return;
+            }
+
+            // 严格执行12个字内截断
+            let shortText = rawText;
+            if (rawText.length > 12) {
+                shortText = rawText.substring(0, 12) + "...";
+            }
+
+            const grass = document.createElement('div');
+            grass.className = 'grass-cluster';
+            
+            // 随机坐标计算（配合你的实景图，将草丛精准限制在山丘下的草坪区域）
+            const x = Math.random() * 75 + 5;  
+            const y = Math.random() * 35 + 55; // 55% - 90% 的区间，视觉层级最合理
+            grass.style.left = `${x}%`;
+            grass.style.top = `${y}%`;
+            grass.style.zIndex = Math.floor(y);
+
+            // 结构：上草下字
+            grass.innerHTML = `
+                <div class="grass-photo"></div>
+                <div class="comment-text" title="${rawText}">${shortText}</div>
+            `;
+
+            // 点击任意单棵草直接手工移除
+            grass.addEventListener('click', () => {
+                grass.style.transform = 'scale(0)';
+                setTimeout(() => {
+                    grass.remove();
+                    grassItems = grassItems.filter(item => item !== grass);
+                }, 200);
+            });
+
+            meadow.appendChild(grass);
+            grassItems.push(grass);
+            complainInput.value = ''; // 发送完毕自动清空
+        }
+
+        // 召唤牛马吃草逻辑
+        function toggleNiuma() {
+            if (cowObj || horseObj) {
+                if (cowObj) cowObj.remove();
+                if (horseObj) horseObj.remove();
+                cowObj = null; horseObj = null;
+                clearInterval(niumaTimer);
+                showToast("牛马已下班~");
+                return;
+            }
+
+            if (grassItems.length === 0) {
+                showToast("草原上没有草，牛马不来哦！");
+                return;
+            }
+
+            showToast("🐮🐴 实景牛马已入场，开始自动除草...");
+
+            cowObj = document.createElement('div');
+            cowObj.className = 'niuma-photo cow-style';
+            cowObj.style.left = '10%'; cowObj.style.top = '65%';
+
+            horseObj = document.createElement('div');
+            horseObj.className = 'niuma-photo horse-style';
+            horseObj.style.left = '70%'; horseObj.style.top = '65%';
+
+            meadow.appendChild(cowObj);
+            meadow.appendChild(horseObj);
+
+            // 牛马吃草自动化跑车
+            niumaTimer = setInterval(() => {
+                if (grassItems.length > 0) {
+                    const targetGrass = grassItems[Math.floor(Math.random() * grassItems.length)];
+                    const activeNiuma = Math.random() > 0.5 ? cowObj : horseObj;
+                    
+                    activeNiuma.style.left = targetGrass.style.left;
+                    activeNiuma.style.top = `calc(${targetGrass.style.top} - 30px)`;
+                    activeNiuma.classList.add('munching');
+
+                    setTimeout(() => {
+                        activeNiuma.classList.remove('munching');
+                        targetGrass.style.transform = 'scale(0)';
+                        setTimeout(() => {
+                            targetGrass.remove();
+                            grassItems = grassItems.filter(item => item !== targetGrass);
+                        }, 200);
+                    }, 600);
+                }
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
